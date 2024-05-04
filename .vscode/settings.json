@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "*.backup": "c"
+        "*.backup": "c",
+        "lv_demo_benchmark.h": "c",
+        "lv_display_private.h": "c"
     }
 }
