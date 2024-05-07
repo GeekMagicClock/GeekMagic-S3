@@ -1,10 +1,8 @@
 #include <lvgl.h>
 #include <lv_conf.h>
 #include "demos/lv_demos.h"
-//#include "demos/benchmark/lv_demo_benchmark.h"
 #include <TFT_eSPI.h>
 TFT_eSPI tft;
-/* Change to your screen resolution */
 void *draw_buf_1;
 unsigned long lastTickMillis = 0;
 #define TFT_HOR_RES 240
@@ -34,8 +32,7 @@ void setup(){
     String LVGL_Arduino = "Hello Arduino!\n";
     LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
     Serial.println(LVGL_Arduino);
-    /* Initialize the (dummy) input device driver */
-    //******************************* MY CODE *******************************************
+
     lv_demo_benchmark();
 }
 
