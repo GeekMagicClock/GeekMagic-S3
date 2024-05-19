@@ -220,6 +220,7 @@
 // For ESP32 Dev board (only tested with GC9A01 display)
 // The hardware SPI can be mapped to any pins
 
+#define TFT_MISO -1 // In some display driver board, it might be written as "SDA" and so on.
 #define TFT_MOSI 11 // In some display driver board, it might be written as "SDA" and so on.
 #define TFT_SCLK 12
 #define TFT_CS   -1  // Chip select control pin
@@ -371,6 +372,7 @@
 // The XPT2046 requires a lower SPI clock rate of 2.5MHz so we define that here:
 #define SPI_TOUCH_FREQUENCY  2500000
 
+#define ESP32_DMA
 // The ESP32 has 2 free SPI ports i.e. VSPI and HSPI, the VSPI is the default.
 // If the VSPI port is in use and pins are not accessible (e.g. TTGO T-Beam)
 // then uncomment the following line:

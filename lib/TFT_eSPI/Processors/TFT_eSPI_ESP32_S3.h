@@ -338,8 +338,8 @@ SPI3_HOST = 2
 
     #if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32S2)
       #if (TFT_MISO == -1)
-        #undef TFT_MISO
-        #define TFT_MISO TFT_MOSI
+        //#undef TFT_MISO
+        //#define TFT_MISO TFT_MOSI
       #endif
     #endif
 
@@ -519,7 +519,8 @@ SPI3_HOST = 2
                                *_spi_cmd = SPI_UPDATE;   \
                         while (*_spi_cmd & SPI_UPDATE);  \
                                *_spi_cmd = SPI_USR;      \
-                        while (*_spi_cmd & SPI_USR);
+                        while (*_spi_cmd & SPI_USR);     
+
 
   // Write 8 bits
   #define tft_Write_8(C) TFT_WRITE_BITS((C)<<8, 16)

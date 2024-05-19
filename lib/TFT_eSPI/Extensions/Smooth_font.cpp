@@ -10,6 +10,7 @@
 ** Function name:           loadFont
 ** Description:             loads parameters from a font vlw array in memory
 *************************************************************************************x*/
+#include <LittleFS.h>
 void TFT_eSPI::loadFont(const uint8_t array[])
 {
   if (array == nullptr) return;
@@ -103,7 +104,8 @@ void TFT_eSPI::loadFont(String fontName, bool flash)
   if (fs_font) {
     spiffs = flash; // true if font is in SPIFFS
 
-    if(spiffs) fontFS = SPIFFS;
+    //if(spiffs) fontFS = SPIFFS;
+    if(spiffs) fontFS = LittleFS;//ifeng
 
     // Avoid a crash on the ESP32 if the file does not exist
     if (fontFS.exists("/" + fontName + ".vlw") == false) {
