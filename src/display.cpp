@@ -31,4 +31,5 @@ void init_screen(){
     tft.setTextColor(TFT_BLACK, TFT_RED);
     tft.setTextSize(4);
     tft.drawString("GeekMagic", 10,100);
+
 }

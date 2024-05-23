@@ -290,6 +290,7 @@ void media_player_process()
 
     if (run_data->file.available())
     {
+        if(run_data->player_docoder != NULL)
         run_data->player_docoder->video_play_screen();
     }
     else
@@ -297,7 +298,7 @@ void media_player_process()
         // 结束播放
         release_player_docoder();
         run_data->file.close();
-        if (0 == cfg_data.switchFlag)
+        if (1 == cfg_data.switchFlag)
         {
             // 创建播放(重复播放)
             video_start(false);

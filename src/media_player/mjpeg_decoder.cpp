@@ -8,10 +8,10 @@ extern TFT_eSPI tft;
 #define VIDEO_WIDTH 240L
 #define VIDEO_HEIGHT 240L
 #define EACH_READ_SIZE 2500     // 每次获取的数据流大小
-#define JPEG_BUFFER_SIZE 10000  // 储存一张jpeg的图像(240*240 10000大概够了，正常一帧差不多3000)
-#define MOVIE_BUFFER_SIZE 20000 // 理论上是JPEG_BUFFER_SIZE的两倍就够了
+#define JPEG_BUFFER_SIZE 100000  // 储存一张jpeg的图像(240*240 10000大概够了，正常一帧差不多3000)
+#define MOVIE_BUFFER_SIZE 200000 // 理论上是JPEG_BUFFER_SIZE的两倍就够了
 
-#define DMA_BUFFER_SIZE 2048 // (16*16*2)
+#define DMA_BUFFER_SIZE 20480 // (16*16*2)
 #if 0
 #define TFT_MISO -1
 #define TFT_MOSI 23
@@ -116,16 +116,18 @@ MjpegPlayDocoder::MjpegPlayDocoder(File *file, bool isUseDMA)
     m_displayBufWithDma[0] = NULL;
     m_displayBufWithDma[1] = NULL;
     m_dmaBufferSel = 0;
+    #if 0
     // The jpeg image can be scaled down by a factor of 1, 2, 4, or 8
     TJpgDec.setJpgScale(1);
     // The colour byte order can be swapped by the decoder
     // using TJpgDec.setSwapBytes(true); or by the TFT_eSPI library:
     m_tftSwapStatus = tft.getSwapBytes();
-    tft.setSwapBytes(true);
     // TJpgDec.setSwapBytes(true);
     // The decoder must be given the exact name of the rendering function above
     SketchCallback callback = (SketchCallback)&MjpegPlayDocoder::tft_output; // 强制转换func()的类型
     TJpgDec.setCallback(callback);
+    #endif
+    tft.setSwapBytes(true);
     video_start();
 }
 
@@ -180,7 +182,9 @@ bool MjpegPlayDocoder::video_start()
     // Serial.print("heap_caps_get_largest_free_block() :");
     // Serial.println((unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 }
-
+#include <JPEGDEC.h>
+extern JPEGDEC jpg;
+extern int jpegDrawCallback(JPEGDRAW *pDraw);
 bool MjpegPlayDocoder::video_play_screen(void)
 {
     // Read video
@@ -191,12 +195,19 @@ bool MjpegPlayDocoder::video_play_screen(void)
         // 一帧数据大概3000B 240M主频时花费50ms  80M时需要150ms
         // unsigned long Millis_1 = GET_SYS_MILLIS(); // 更新的时间
         uint32_t jpg_size = readJpegFromFile(m_pFile);
-        // Serial.println(jpg_size);
         // Serial.print(GET_SYS_MILLIS() - Millis_1);
         // Serial.print(" ");
         // Millis_1 = GET_SYS_MILLIS();
         // Draw the image, top left at 0,0 - DMA request is handled in the call-back tft_output() in this sketch
-        TJpgDec.drawJpg(0, 0, m_jpegBuf, jpg_size);
+        
+        //TJpgDec.drawJpg(0, 0, m_jpegBuf, jpg_size);
+        jpg.setPixelType(RGB565_BIG_ENDIAN);
+        jpg.openRAM(m_jpegBuf,jpg_size, jpegDrawCallback);
+        //Serial.printf("read jpg size %d\n", jpg_size);
+        if(jpg.decode(0,0,0) == 1){
+            //Serial.printf("decode ok %d\n", jpg_size);
+        }
+
         // Serial.println(GET_SYS_MILLIS() - Millis_1);
     }
     else
