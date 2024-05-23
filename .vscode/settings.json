@@ -2,6 +2,10 @@
     "files.associations": {
         "*.backup": "c",
         "lv_demo_benchmark.h": "c",
-        "lv_display_private.h": "c"
+        "lv_display_private.h": "c",
+        "lv_style.h": "c",
+        "array": "cpp",
+        "string": "cpp",
+        "string_view": "cpp"
     }
 }
