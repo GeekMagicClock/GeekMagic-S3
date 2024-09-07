@@ -1,0 +1,358 @@
+#include <Arduino.h>
+#include <LittleFS.h>
+#include <WiFi.h>
+#include "my_debug.h"
+#include "display.h"
+//#define TURBO_MODE
+
+#include <lvgl.h>
+#include <lv_conf.h>
+
+void *draw_buf_1;
+unsigned long lastTickMillis = 0;
+#define TFT_HOR_RES 240
+#define TFT_VER_RES 240
+static lv_display_t *disp;
+//#define DRAW_BUF_SIZE (TFT_HOR_RES * TFT_VER_RES / 10 * (LV_COLOR_DEPTH / 8))
+#define DRAW_BUF_SIZE (TFT_HOR_RES * TFT_VER_RES*2 )
+//#define DRAW_BUF_SIZE (65535)
+
+lv_obj_t *img1 = NULL;
+lv_obj_t *label =  NULL;
+
+#include <TFT_eSPI.h>
+extern TFT_eSPI tft;
+
+#define IMG_WIDTH 240
+#define IMG_HEIGHT 240
+#if 0
+lv_obj_t * canvas = NULL; 
+static lv_color_t *canvas_buf = NULL;//[IMG_WIDTH * IMG_HEIGHT];
+
+#define COLOR_BG LV_COLOR_MAKE(211, 211, 211) // Light gray
+#define COLOR_GREEN LV_COLOR_MAKE(0, 255, 0)
+#define COLOR_RED LV_COLOR_MAKE(255, 0, 0)
+
+#define M 2000 // Animation interval in milliseconds
+#define N 3 // Number of labels to display at a time
+
+//TFT_eSPI tft = TFT_eSPI(); /* TFT instance */
+
+static lv_obj_t *labels[N] = {NULL}; 
+static int current_index = 0;
+static const char *stock_names[] = {"1 AAPL", "2 TSLA", "3 AMZN", "4 GOOGL", "5 MSFT", "6 FB", "7 NFLX", "8 NVDA", "9 BABA", "10 INTC"};
+static const char *stock_prices[] = {"150.25", "620.50", "3200.75", "2700.60", "300.40", "355.30", "590.20", "650.50", "200.00", "55.30"};
+static const char *stock_changes[] = {"+1.5%", "-0.8%", "+2.3%", "+0.5%", "-1.0%", "+1.2%", "-2.0%", "+3.5%", "-1.8%", "+0.9%"};
+static bool stock_is_positive[] = {true, false, true, true, false, true, false, true, false, true};
+
+static lv_obj_t *create_stock_label(lv_obj_t *parent, const char *stock_name, const char *price, const char *change, bool is_positive) {
+    lv_obj_t *label = lv_label_create(parent);
+    lv_obj_set_size(label, 230, 70); // Assuming each label takes 60px height
+    lv_obj_set_style_radius(label, 5, 0); // Set corner radius
+    lv_obj_set_style_bg_color(label, lv_color_hex(0x202020), 0);
+    lv_obj_set_style_bg_opa(label, LV_OPA_COVER, 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(0xffffff), 0);
+    lv_obj_set_style_pad_all(label, 10, 0); // Padding for text inside the label
+
+    char text_buf[100];
+    snprintf(text_buf, sizeof(text_buf), "%s\nPrice: %s Change: %s", stock_name, price, change);
+    lv_label_set_text(label, text_buf);
+
+    lv_color_t color = is_positive ? lv_color_hex(0x00ff00): lv_color_hex(0xff0000);
+    lv_obj_set_style_text_color(label, color, LV_PART_MAIN);
+
+    return label;
+}
+// Custom animation callback to delete object
+static void anim_del_cb(lv_anim_t *a) {
+    lv_obj_del((lv_obj_t *)a->var);
+}
+#if 0
+static void animate_stocks(lv_timer_t *timer) {
+    // Delete existing labels with animation
+    for (int i = 0; i < N; i++) {
+        if (labels[i] != NULL) {
+            lv_anim_t a;
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, labels[i]);
+            lv_anim_set_values(&a, 0, -60); // Move up by 60 pixels (height of the label)
+            lv_anim_set_time(&a, 500);
+            lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
+            lv_anim_set_ready_cb(&a, anim_del_cb);
+            lv_anim_start(&a);
+        }
+    }
+
+    // Create new labels with animation
+    for (int i = 0; i < N; i++) {
+        int index = (current_index + i) % (sizeof(stock_names) / sizeof(stock_names[0]));
+        labels[i] = create_stock_label(lv_scr_act(), stock_names[index], stock_prices[index], stock_changes[index], stock_is_positive[index]);
+        lv_obj_align(labels[i], LV_ALIGN_TOP_MID, 0, 240 + i * 80); // Start off-screen at the bottom
+        lv_anim_t a;
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, labels[i]);
+        lv_anim_set_values(&a, 240 + i * 80, i * 80); // Move to the final position
+        lv_anim_set_time(&a, 500);
+        lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
+        lv_anim_start(&a);
+    }
+
+    current_index = (current_index + N) % (sizeof(stock_names) / sizeof(stock_names[0]));
+}
+#endif
+#if 0
+static void animate_stocks(lv_timer_t *timer) {
+    // Animate the current labels to move up
+    for (int i = 0; i < N; i++) {
+        if (labels[i] != NULL) {
+            lv_anim_t a;
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, labels[i]);
+            lv_anim_set_values(&a, lv_obj_get_y(labels[i]), lv_obj_get_y(labels[i]) - 80); // Move up by 80 pixels (height of the label)
+            lv_anim_set_time(&a, 500);
+            lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
+            
+            lv_anim_start(&a);
+
+            // Add fade-out effect for labels going out of screen
+            lv_anim_t fade_out;
+            lv_anim_init(&fade_out);
+            lv_anim_set_var(&fade_out, labels[i]);
+            lv_anim_set_values(&fade_out, LV_OPA_COVER, LV_OPA_TRANSP);
+            lv_anim_set_time(&fade_out, 500);
+            lv_anim_set_exec_cb(&fade_out, (lv_anim_exec_xcb_t)lv_obj_set_style_opa);
+            lv_anim_start(&fade_out);
+            if (lv_obj_get_y(labels[i]) <= -80) { // If the label is out of screen, delete it
+                lv_anim_set_ready_cb(&a, anim_del_cb);
+            }
+        }
+    }
+
+    // Create new label at the bottom if needed
+    int index = (current_index + N) % (sizeof(stock_names) / sizeof(stock_names[0]));
+    lv_obj_t *new_label = create_stock_label(lv_scr_act(), stock_names[index], stock_prices[index], stock_changes[index], stock_is_positive[index]);
+    lv_obj_align(new_label, LV_ALIGN_TOP_MID, 0, 240); // Start off-screen at the bottom
+
+    // Add fade-in effect for new labels
+    lv_obj_set_style_opa(new_label, LV_OPA_TRANSP, 0);
+    lv_anim_t fade_in;
+    lv_anim_init(&fade_in);
+    lv_anim_set_var(&fade_in, new_label);
+    lv_anim_set_values(&fade_in, LV_OPA_TRANSP, LV_OPA_COVER);
+    lv_anim_set_time(&fade_in, 500);
+    lv_anim_set_exec_cb(&fade_in, (lv_anim_exec_xcb_t)lv_obj_set_style_opa);
+    lv_anim_start(&fade_in);
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, new_label);
+    lv_anim_set_values(&a, 240, 160); // Move to the final position (bottom position)
+    lv_anim_set_time(&a, 500);
+    lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
+    lv_anim_start(&a);
+
+    // Shift the labels array and update current index
+    for (int i = 0; i < N - 1; i++) {
+        labels[i] = labels[i + 1];
+    }
+    labels[N - 1] = new_label;
+    current_index = (current_index + 1) % (sizeof(stock_names) / sizeof(stock_names[0]));
+}
+#endif
+static void animate_stocks(lv_timer_t *timer) {
+    // Animate the current labels to move up
+    for (int i = 0; i < N; i++) {
+        if (labels[i] != NULL) {
+            Serial.printf("i = %d\n", i);
+            lv_anim_t a;
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, labels[i]);
+            lv_anim_set_values(&a, lv_obj_get_y(labels[i]), lv_obj_get_y(labels[i]) - 80); // Move up by 80 pixels (height of the label)
+            lv_anim_set_time(&a, 500);
+            lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
+            lv_anim_start(&a);
+
+            if (lv_obj_get_y(labels[i]) <= -80) { // If the label is out of screen, delete it
+                lv_anim_set_ready_cb(&a, anim_del_cb);
+            }
+        }
+    }
+
+    Serial.printf("current = %d\n", current_index);
+    // Create new label at the middle position
+    int index = (current_index) % (sizeof(stock_names) / sizeof(stock_names[0]));
+    lv_obj_t *new_label = create_stock_label(lv_scr_act(), stock_names[index], stock_prices[index], stock_changes[index], stock_is_positive[index]);
+    lv_obj_align(new_label, LV_ALIGN_TOP_MID, 0, 160); // Start off-screen at the bottom
+#if 0
+    // Add fade-in effect for new labels
+    lv_obj_set_style_opa(new_label, LV_OPA_TRANSP, 0);
+    lv_anim_t fade_in;
+    lv_anim_init(&fade_in);
+    lv_anim_set_var(&fade_in, new_label);
+    lv_anim_set_values(&fade_in, LV_OPA_TRANSP, LV_OPA_COVER);
+    lv_anim_set_time(&fade_in, 500);
+    lv_anim_set_exec_cb(&fade_in, (lv_anim_exec_xcb_t)lv_obj_set_style_opa);
+    lv_anim_start(&fade_in);
+#endif
+    // Move new label to the middle position
+    lv_anim_t a_new;
+    lv_anim_init(&a_new);
+    lv_anim_set_var(&a_new, new_label);
+    lv_anim_set_values(&a_new, 240, 160); // Move to the final position (y = 160)
+    lv_anim_set_time(&a_new, 500);
+    lv_anim_set_exec_cb(&a_new, (lv_anim_exec_xcb_t)lv_obj_set_y);
+    lv_anim_start(&a_new);
+
+    // Shift the labels array and update current index
+    for (int i = N - 1; i > 0; i--) {
+        labels[i] = labels[i - 1];
+    }
+    labels[0] = new_label;
+    current_index = (current_index + 1) % (sizeof(stock_names) / sizeof(stock_names[0]));
+}
+#endif
+void setup(){
+    Serial.begin(115200);
+    delay(1000);
+    if(!LittleFS.begin()){
+        DBG_PTN("file system not mounted");
+        yield();
+    }
+    //delay(3000);
+    init_screen();
+
+    if(psramInit()){
+        Serial.println("PSRAM is correctly initialized");
+    }else{
+        Serial.println("PSRAM not available");
+    }
+#if 0
+    lv_init();
+    draw_buf_1 = heap_caps_malloc(DRAW_BUF_SIZE, MALLOC_CAP_DMA);
+    disp = lv_tft_espi_create(TFT_HOR_RES, TFT_VER_RES, draw_buf_1, DRAW_BUF_SIZE);
+
+    String LVGL_Arduino = "Hello Arduino!\n";
+    LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
+    Serial.println(LVGL_Arduino);
+#endif
+#if 0
+    imageData = (uint16_t *)heap_caps_malloc(tft.width()* tft.height()* sizeof(uint16_t), MALLOC_CAP_SPIRAM);
+    if (!imageData) {
+        Serial.println("内存分配失败！");
+        return ;
+    }
+#endif
+    
+    //img_dsc.header = header;
+    //img_dsc.data = (const uint8_t *)imageData;
+    //img_dsc.data_size = tft.width()* tft.height()* sizeof(uint16_t);
+     // 创建画布对象并设置缓冲区
+     #if 0
+        canvas_buf = (lv_color_t *)malloc(IMG_WIDTH * IMG_HEIGHT * sizeof(lv_color_t));
+        memset(canvas_buf,0, sizeof(canvas_buf));
+        if (canvas_buf == NULL) {
+            Serial.println("Failed to allocate memory for canvas buffer");
+            return;
+        }
+            Serial.println("success to allocate memory for canvas buffer");
+    #endif    
+#if 0
+        canvas = lv_canvas_create(lv_scr_act());
+        //lv_canvas_set_buffer(canvas, NULL, IMG_WIDTH, IMG_HEIGHT, LV_COLOR_FORMAT_RGB565);
+        // 设置画布对象的位置和大小
+        lv_obj_set_pos(canvas, 0, 0);
+        lv_obj_set_size(canvas, IMG_WIDTH, IMG_HEIGHT);
+        lv_canvas_fill_bg(canvas, lv_color_black(), LV_OPA_COVER);
+
+        lv_canvas_set_buffer(canvas, imageData, IMG_WIDTH, IMG_HEIGHT, LV_COLOR_FORMAT_RGB565);
+        //img1 = lv_img_create(lv_scr_act());
+#endif
+#if 0
+    label = lv_label_create(lv_scr_act());
+    lv_obj_align( label, LV_ALIGN_CENTER, 0, 0 );
+    static lv_style_t style;
+    lv_style_init(&style); // 初始化样式
+    lv_style_set_text_font(&style, &lv_font_montserrat_48);
+    lv_style_set_bg_color(&style, lv_color_make(00,0xFF,00));
+    lv_style_set_bg_opa(&style, LV_OPA_0);
+    lv_style_set_border_width(&style, 0);
+    lv_style_set_border_color(&style,lv_color_make(0,0,0xff));
+    lv_style_set_border_opa(&style,LV_OPA_0);
+    lv_style_set_text_color(&style, lv_color_make(0xff,0xff,0xff));
+    lv_obj_add_style(label, &style, 0);
+#endif
+
+    // screenWidth * screenHeight / 2 大概是一帧JPG文件的大小，240x240差不多10-15kb一帧，这个分配了28.8kb可以说是很充足了
+    #if 0
+    mjpeg_buf = (uint8_t *)heap_caps_malloc(240 * 240, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (!mjpeg_buf)
+    {
+        Serial.println(F("[MJPEG] Draw buff malloc failed!"));
+        return ;
+    }
+    #endif
+
+    //label = lv_label_create(img1);
+    //init_jpg();
+    //DBG_PTN("draw jpg");
+    //draw_jpg("/starry.jpg");
+    //drawGif("/space.gif",0,0,true); 
+    //media_player_init(); 
+    //drawGif("/space.gif", 0, 0, true);
+    //drawGif(GIF_FILE, 0, 0, true);
+    DBG_PTN("boot done");
+// Initialize the first 3 labels with animation
+#if 0
+    for(int i= 0; i < N; i++)
+    {
+        //int i= 0;
+        //int index = 0;
+        int index = i % (sizeof(stock_names) / sizeof(stock_names[0]));
+        labels[0] = create_stock_label(lv_scr_act(), stock_names[index], stock_prices[index], stock_changes[index], stock_is_positive[index]);
+        lv_obj_align(labels[i], LV_ALIGN_TOP_MID, 0, 240 + i * 80); // Start off-screen at the bottom
+
+#if 0
+        // Add fade-in effect for new labels
+        lv_obj_set_style_opa(labels[i], LV_OPA_TRANSP, 0);
+        lv_anim_t fade_in;
+        lv_anim_init(&fade_in);
+        lv_anim_set_var(&fade_in, labels[i]);
+        lv_anim_set_values(&fade_in, LV_OPA_TRANSP, LV_OPA_COVER);
+        lv_anim_set_time(&fade_in, 500 + i * 200); // Stagger the animations
+        lv_anim_set_exec_cb(&fade_in, (lv_anim_exec_xcb_t)lv_obj_set_style_opa);
+        lv_anim_start(&fade_in);
+#endif
+        // Move new label to the final position
+        lv_anim_t a;
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, labels[i]);
+        lv_anim_set_values(&a, 240 + i * 80, 160); // Move to the final position (y = 160)
+        lv_anim_set_time(&a, 500 + i * 200); // Stagger the animations
+        lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
+        lv_anim_start(&a);
+    }
+#endif
+    //lv_timer_create(animate_stocks, M, NULL);
+}
+#include "gif.h"
+#define GIF_FILE "/pia.gif"
+void loop(){
+    #if 1
+    #else
+    //media_player_process();
+    //lv_canvas_set_buffer(canvas, imageData, IMG_WIDTH, IMG_HEIGHT, LV_COLOR_FORMAT_RGB565);
+    unsigned int tickPeriod = millis() - lastTickMillis;
+    lv_tick_inc(tickPeriod);
+    lastTickMillis = millis();
+    lv_task_handler();
+    //delay(1000);
+    #endif
+    #if 1
+        int ret = drawGif(GIF_FILE, 0, 0, false);
+        if(ret){
+            drawGif(GIF_FILE, 0, 0, true);
+        }
+    #endif
+   
+    return;
+}

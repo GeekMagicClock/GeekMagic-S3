@@ -4,6 +4,7 @@
 TFT_eSPI tft;
 void init_screen();
 void set_tft_brt(int brt);
+void set_tft_brt(int brt);
 
 #define LCD_BL_PWM_CHANNEL 0
 
@@ -17,14 +18,13 @@ void set_tft_brt(int brt){
 void init_screen(){
     set_tft_brt(100);
     tft.begin();
-#if 1
+
     bool ret = tft.initDMA();
     if(ret){
         Serial.println("tft dma init ok");
     }else{
         Serial.println("tft dma init fail");
     }
-#endif
 
     tft.fillScreen(TFT_GREEN);
     tft.loadFont("AF40");

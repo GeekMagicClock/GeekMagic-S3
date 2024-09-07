@@ -54,6 +54,7 @@ lv_display_t * lv_tft_espi_create(uint32_t hor_res, uint32_t ver_res, void * buf
     dsc->tft = new TFT_eSPI(hor_res, ver_res);
     dsc->tft->begin();          /* TFT init */
     dsc->tft->setRotation(0);   /* Landscape orientation, flipped */
+    //dsc->tft->initDMA();
     lv_display_set_driver_data(disp, (void *)dsc);
     lv_display_set_flush_cb(disp, flush_cb);
     lv_display_set_buffers(disp, (void *)buf, NULL, buf_size_bytes, LV_DISPLAY_RENDER_MODE_PARTIAL);
@@ -74,6 +75,8 @@ static void flush_cb(lv_display_t * disp, const lv_area_t * area, uint8_t * px_m
     dsc->tft->startWrite();
     dsc->tft->setAddrWindow(area->x1, area->y1, w, h);
     dsc->tft->pushColors((uint16_t *)px_map, w * h, true);
+    dsc->tft->dmaWait();
+    dsc->tft->pushImageDMA(area->x1, area->y1, w, h, (uint16_t*)px_map);
     dsc->tft->endWrite();
 
     lv_display_flush_ready(disp);

@@ -12,7 +12,8 @@ extern TFT_eSPI tft;
 #define DISPLAY_HEIGHT tft.height()
 #define BUFFER_SIZE 240           // Optimum is >= GIF width or integral division of width
 
-#define USE_DMA
+//#define TURBO_MODE 
+//#define USE_DMA
 
 #ifdef USE_DMA
   uint16_t usTemp[2][BUFFER_SIZE]; // Global to support DMA use
@@ -27,7 +28,315 @@ int x_offset, y_offset;
 /* gif高度小于canvas高度时，用户canvas居中显示 */
 int height_offset = 0;
 int max_frame_height;
+#include <lvgl.h>
+extern lv_obj_t *canvas;
+static int frames = 0;
+#if 1
+static lv_color_t rgb565_to_lv_color(uint16_t color_rgb565) {
+  // Convert big-endian to little-endian
+    color_rgb565 = (color_rgb565 >> 8) | (color_rgb565 << 8);
 
+    uint8_t r = (color_rgb565 >> 11) & 0x1F; // Extract red component (5 bits)
+    uint8_t g = (color_rgb565 >> 5) & 0x3F;  // Extract green component (6 bits)
+    uint8_t b = color_rgb565 & 0x1F;         // Extract blue component (5 bits)
+
+    // Convert to 8-bit per channel
+    r = (r << 3) | (r >> 2);
+    g = (g << 2) | (g >> 4);
+    b = (b << 3) | (b >> 2);
+
+    return lv_color_make(r, g, b);
+}
+#endif
+#if 0
+void GIFDraw(GIFDRAW *pDraw)
+{
+    uint8_t *s;
+    uint16_t *usPalette;
+    int x, y, iWidth;
+
+    // 获取绘制相关参数
+    iWidth = pDraw->iWidth;
+    usPalette = pDraw->pPalette;
+    y = pDraw->iY + pDraw->y; // 当前绘制的行位置
+    if (y >= DISPLAY_HEIGHT || pDraw->iX >= DISPLAY_WIDTH || iWidth < 1)
+        return;
+
+    // 临时缓冲区
+    uint16_t usTemp[BUFFER_SIZE];
+
+    // 获取画布的缓冲区
+    uint16_t *canvas_buf = (uint16_t*)lv_canvas_get_buf(canvas);
+
+    // 复制每一行像素数据到缓冲区的对应位置
+    s = pDraw->pPixels;
+    for (x = 0; x < iWidth; x++)
+    {
+        usTemp[x] = usPalette[s[x]];
+    }
+
+    // 将每行像素数据绘制到画布的缓冲区对应位置
+    for (x = 0; x < iWidth; x++)
+    {
+        canvas_buf[y * DISPLAY_WIDTH + pDraw->iX + x] = usTemp[x]>>8 | usTemp[x]<<8;
+    }
+    // 判断是否绘制完成一帧图像
+    if (y + 1 == pDraw->iHeight)
+    {
+        Serial.printf("frame = %d\n", frames++);
+        // 刷新显示
+        lv_obj_invalidate(canvas);
+    }
+}
+#endif
+#if 0
+// Draw a line of image directly on the LCD
+void GIFDraw(GIFDRAW *pDraw){
+    uint8_t *s;
+    uint16_t *usPalette;
+    int x, y, iWidth, iCount;
+
+    // Display bounds check and cropping
+    iWidth = pDraw->iWidth;
+    if (iWidth + pDraw->iX > DISPLAY_WIDTH)
+        iWidth = DISPLAY_WIDTH - pDraw->iX;
+    usPalette = pDraw->pPalette;
+    y = pDraw->iY + pDraw->y; // current line
+    if (y >= DISPLAY_HEIGHT || pDraw->iX >= DISPLAY_WIDTH || iWidth < 1)
+        return;
+
+    // 获取画布的缓冲区
+    uint16_t *canvas_buf = (uint16_t*)lv_canvas_get_buf(canvas);
+
+    // Old image disposal
+    s = pDraw->pPixels;
+    if (pDraw->ucDisposalMethod == 2) // restore to background color
+    {
+        for (x = 0; x < iWidth; x++)
+        {
+            if (s[x] == pDraw->ucTransparent)
+                s[x] = pDraw->ucBackground;
+        }
+        pDraw->ucHasTransparency = 0;
+    }
+
+    // 临时缓冲区
+    uint16_t usTemp[BUFFER_SIZE];
+
+    // Apply the new pixels to the main image
+    if (pDraw->ucHasTransparency) // if transparency used
+    {
+        uint8_t *pEnd, c, ucTransparent = pDraw->ucTransparent;
+        pEnd = s + iWidth;
+        x = 0;
+        iCount = 0; // count non-transparent pixels
+        while (x < iWidth)
+        {
+            c = ucTransparent - 1;
+            while (c != ucTransparent && s < pEnd && iCount < BUFFER_SIZE)
+            {
+                c = *s++;
+                if (c == ucTransparent) // done, stop
+                {
+                    s--; // back up to treat it like transparent
+                }
+                else // opaque
+                {
+                    // Set pixel on the canvas
+                    //usTemp[0][iCount] = usPalette[c];
+                    usTemp[iCount] = usPalette[c];
+                    iCount++;
+                }
+            }
+            if (iCount) // any opaque pixels?
+            {
+                for (int i = 0; i < iCount; i++)
+                {
+                    canvas_buf[y * DISPLAY_WIDTH + pDraw->iX + x + i] = usTemp[i];//>>8 || usTemp[i]<<8;
+                }
+                x += iCount;
+                iCount = 0;
+            }
+            // no, look for a run of transparent pixels
+            c = ucTransparent;
+            while (c == ucTransparent && s < pEnd)
+            {
+                c = *s++;
+                if (c == ucTransparent)
+                    x++;
+                else
+                    s--;
+            }
+        }
+    }
+    else
+    {
+        s = pDraw->pPixels;
+
+        for (iCount = 0; iCount < iWidth; iCount++)
+        {
+            usTemp[iCount] = usPalette[*s++];
+        }
+
+        for (int i = 0; i < iCount; i++)
+        {
+            canvas_buf[y * DISPLAY_WIDTH + pDraw->iX + x + i] = usTemp[i];//>>8 || usTemp[i]<<8;//usTemp[0][i];
+        }
+        iWidth -= iCount;
+        // Loop if pixel buffer smaller than width
+        while (iWidth > 0)
+        {
+            if (iWidth <= BUFFER_SIZE)
+                for (iCount = 0; iCount < iWidth; iCount++) usTemp[iCount] = usPalette[*s++];
+            else
+                for (iCount = 0; iCount < BUFFER_SIZE; iCount++) usTemp[iCount] = usPalette[*s++];
+
+            for (int i = 0; i < iCount; i++)
+            {
+                canvas_buf[y * DISPLAY_WIDTH + pDraw->iX + (pDraw->iWidth - iWidth) + i] = usTemp[i];//>>8 || usTemp[i]<<8;//usTemp[0][i];
+            }
+            iWidth -= iCount;
+        }
+    }
+    #if 0
+    // 将每行像素数据绘制到画布的缓冲区对应位置
+    for (x = 0; x < iWidth; x++)
+    {
+      canvas_buf[y * DISPLAY_WIDTH + pDraw->iX + x] = usTemp[0][x];
+    }
+    #endif
+    // 判断是否绘制完成一帧图像
+    if (y + 1 == pDraw->iHeight)
+    {
+        //Serial.printf("frame = %d\n", frames++);
+        // 刷新显示
+        lv_obj_invalidate(canvas);
+    }
+}
+#endif
+#if 0
+static lv_color_t rgb565_to_lv_color(uint16_t color_rgb565) {
+  // Convert big-endian to little-endian
+    color_rgb565 = (color_rgb565 >> 8) | (color_rgb565 << 8);
+
+    uint8_t r = (color_rgb565 >> 11) & 0x1F; // Extract red component (5 bits)
+    uint8_t g = (color_rgb565 >> 5) & 0x3F;  // Extract green component (6 bits)
+    uint8_t b = color_rgb565 & 0x1F;         // Extract blue component (5 bits)
+
+    // Convert to 8-bit per channel
+    r = (r << 3) | (r >> 2);
+    g = (g << 2) | (g >> 4);
+    b = (b << 3) | (b >> 2);
+
+    return lv_color_make(r, g, b);
+}
+//1. 在画布上绘制每一个像素点，但是绘制很慢，有利于了解绘制过程
+// Draw a line of image directly on the LCD
+void GIFDraw(GIFDRAW *pDraw){
+    uint8_t *s;
+    uint16_t *usPalette;
+    int x, y, iWidth, iCount;
+
+    // Display bounds check and cropping
+    iWidth = pDraw->iWidth;
+    if (iWidth + pDraw->iX > DISPLAY_WIDTH)
+        iWidth = DISPLAY_WIDTH - pDraw->iX;
+    usPalette = pDraw->pPalette;
+    y = pDraw->iY + pDraw->y; // current line
+    if (y >= DISPLAY_HEIGHT || pDraw->iX >= DISPLAY_WIDTH || iWidth < 1)
+        return;
+
+    // Old image disposal
+    s = pDraw->pPixels;
+    if (pDraw->ucDisposalMethod == 2) // restore to background color
+    {
+        for (x = 0; x < iWidth; x++)
+        {
+            if (s[x] == pDraw->ucTransparent)
+                s[x] = pDraw->ucBackground;
+        }
+        pDraw->ucHasTransparency = 0;
+    }
+
+    // Apply the new pixels to the main image
+    if (pDraw->ucHasTransparency) // if transparency used
+    {
+        uint8_t *pEnd, c, ucTransparent = pDraw->ucTransparent;
+        pEnd = s + iWidth;
+        x = 0;
+        iCount = 0; // count non-transparent pixels
+        while (x < iWidth)
+        {
+            c = ucTransparent - 1;
+            while (c != ucTransparent && s < pEnd && iCount < BUFFER_SIZE)
+            {
+                c = *s++;
+                if (c == ucTransparent) // done, stop
+                {
+                    s--; // back up to treat it like transparent
+                }
+                else // opaque
+                {
+                    // Set pixel on the canvas
+                    usTemp[0][iCount] = usPalette[c];
+                    iCount++;
+                }
+            }
+            if (iCount) // any opaque pixels?
+            {
+                for (int i = 0; i < iCount; i++)
+                {
+                    lv_canvas_set_px(canvas, pDraw->iX + x + i, y, rgb565_to_lv_color(usTemp[0][i]),LV_OPA_COVER);
+                }
+                x += iCount;
+                iCount = 0;
+            }
+            // no, look for a run of transparent pixels
+            c = ucTransparent;
+            while (c == ucTransparent && s < pEnd)
+            {
+                c = *s++;
+                if (c == ucTransparent)
+                    x++;
+                else
+                    s--;
+            }
+        }
+    }
+    else
+    {
+        s = pDraw->pPixels;
+
+        for (iCount = 0; iCount < iWidth; iCount++)
+        {
+            usTemp[0][iCount] = usPalette[*s++];
+        }
+
+        for (int i = 0; i < iCount; i++)
+        {
+            //lv_canvas_set_px(canvas, pDraw->iX + i, y, lv_color_make((usTemp[0][i] >> 11) & 0x1F, (usTemp[0][i] >> 5) & 0x3F, usTemp[0][i] & 0x1F),LV_OPA_COVER);
+            lv_canvas_set_px(canvas, pDraw->iX + i, y, rgb565_to_lv_color(usTemp[0][i]),LV_OPA_COVER);
+        }
+
+        iWidth -= iCount;
+        // Loop if pixel buffer smaller than width
+        while (iWidth > 0)
+        {
+            if (iWidth <= BUFFER_SIZE)
+                for (iCount = 0; iCount < iWidth; iCount++) usTemp[0][iCount] = usPalette[*s++];
+            else
+                for (iCount = 0; iCount < BUFFER_SIZE; iCount++) usTemp[0][iCount] = usPalette[*s++];
+
+            for (int i = 0; i < iCount; i++)
+            {
+                lv_canvas_set_px(canvas, pDraw->iX + (pDraw->iWidth - iWidth) + i, y, rgb565_to_lv_color(usTemp[0][i]), LV_OPA_COVER);
+            }
+            iWidth -= iCount;
+        }
+    }
+}
+#endif
+#if 0
 // Draw a line of image directly on the LCD
 void GIFDraw(GIFDRAW *pDraw)
 {
@@ -142,9 +451,10 @@ void GIFDraw(GIFDRAW *pDraw)
     }
   }
 } /* GIFDraw() */
+#endif
 
 //TFT_eSprite spt = TFT_eSprite(&tft);
-#if 0
+#if 1
 // Draw a line of image directly on the LCD
 static void GIFDraw(GIFDRAW *pDraw)
 {
@@ -311,7 +621,7 @@ static void * GIFOpenFile(const char *fname, int32_t *pSize)
   //  digitalWrite(SD_CS_PIN,LOW);
   //f = SD.open(fname);
   if (f) {
-    //DBG_PTNf("gif open %s\n", fname);
+    Serial.printf("gif open %s\n", fname);
     *pSize = f.size();
     //DBG_PTNf("filesize [%d]\n", *pSize);
     if(f.size() == 0) return NULL;
@@ -385,14 +695,14 @@ static int ShowGIF(const char *name){
   //DBG_PTNf("Start show gif  [%s]\r\n",name); 
   {
     //DBG_PTNf("Successfully opened GIF; Canvas size = %d x %d\n", gif.getCanvasWidth(), gif.getCanvasHeight());
-    tft.startWrite(); // The TFT chip slect is locked low
+    //tft.startWrite(); // The TFT chip slect is locked low
     //DBG_PTNf(" tft size = %d x %d\n",tft.width(), tft.height());
-    if(gif->playFrame(true, NULL))
+    if(gif->playFrame(true, NULL)>0)
     {
       iFrames++;
       //yield();
       //Serial.printf(" frames [%d]\n",iFrames);
-
+#if 0
       //tft.loadFont("AF40");
       tft.setTextColor(TFT_WHITE);
       //tft.drawString(String(hour()/10)+String(hour()%10)+":",100,180);
@@ -400,7 +710,7 @@ static int ShowGIF(const char *name){
       //tft.drawString(String(minute()/10)+String(minute()%10),170,180);
       tft.drawString("36",170,180);
       //tft.unloadFont();
-
+#endif
     }else //no more frames
     {
         
@@ -420,7 +730,7 @@ static int ShowGIF(const char *name){
   return 0;
 }
 static char last_gif_name[64]={0};
-#include "space.h"
+//#include "space.h"
 void gifInit(const char *name, bool force){
   //force true 为强制重新播放该gif
   // 文件名更换，需要重新初始化
@@ -439,13 +749,14 @@ uint8_t pTurboBuffer[TURBO_BUFFER_SIZE + 256 + (160 * 120)];
 #endif
   //打开一个新的gif文件
   
-  gif->begin(GIF_PALETTE_RGB565_BE);
+  //gif->begin(GIF_PALETTE_RGB565_BE);
+  gif->begin(GIF_PALETTE_RGB565_LE);
   //gif.open("/badapple.gif", GIFOpenFile, GIFCloseFile, GIFReadFile, GIFSeekFile, GIFDraw);
-  //gif->open(name, GIFOpenFile, GIFCloseFile, GIFReadFile, GIFSeekFile, GIFDraw);
-  gif->open((uint8_t *)space, sizeof(space), GIFDraw);
+  gif->open(name, GIFOpenFile, GIFCloseFile, GIFReadFile, GIFSeekFile, GIFDraw);
+  //gif->open((uint8_t *)space, sizeof(space), GIFDraw);
 
 #ifdef TURBO_MODE
-    gif.setTurboBuf(pTurboBuffer);
+    gif->setTurboBuf(pTurboBuffer);
 #endif
   init_gif = 1;
 }
@@ -457,12 +768,12 @@ void gifDeinit(){
 } 
 
 int drawGif(const char *filename, int xpos, int ypos, bool force){
-  //DBG_PTNf("debug gif draw1\r\n");
+  //DBG_PTN("debug gif draw1\r\n");
   x_offset = xpos;
   y_offset = ypos;
 
   /* 和Tjpg_decoder 冲突 */
-  tft.setSwapBytes(false); // We need to swap the colour bytes (endianess)
+  tft.setSwapBytes(true); // We need to swap the colour bytes (endianess)
 
   gifInit(filename, force);
   return ShowGIF(filename);

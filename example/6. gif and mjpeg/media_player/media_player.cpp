@@ -76,7 +76,6 @@ File_Info * listDir(const char *dirname)
     }
 
     int dir_len = strlen(dirname) + 1;
-
     // 头节点的创建（头节点用来记录此文件夹）
     File_Info *head_file = (File_Info *)malloc(sizeof(File_Info));
     head_file->file_type = FILE_TYPE_FOLDER;
@@ -93,6 +92,11 @@ File_Info * listDir(const char *dirname)
     while (file)
     {
         // if (levels)
+        String filename = file.name();
+       if (!filename.endsWith(".mjpeg") && !filename.endsWith(".MJPEG")) { 
+            file = root.openNextFile();
+            continue;
+       }
         // {
         //     listDir(file.name(), levels - 1);
         // }
