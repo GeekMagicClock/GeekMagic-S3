@@ -1,5 +1,5 @@
 //#include <SD.h>
-#include <LITTLEFS.h>
+#include <LittleFS.h>
 #include <AnimatedGIF.h>
 #include <TFT_eSPI.h> 
 #include "my_debug.h"
